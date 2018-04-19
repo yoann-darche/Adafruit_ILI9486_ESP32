@@ -6,6 +6,8 @@ This library has been modified for the Maple Mini
 modified by IOXhop (www.ioxhop.com)
  - Add micro MISO MOSI and SCK pin
 -----------
+modified by Yoann Darche
+ - Add the updated to support SPI-4wire mode / 18bit Color mode
 */
 
 #ifndef _ADAFRUIT_ILI9486H_
@@ -54,39 +56,30 @@ modified by IOXhop (www.ioxhop.com)
 #define PINK        0xF81F
 
 /*
-Define pins and Output Data Registers
+	Define pins and Output Data Registers
 */
 
-//Control pins |RS |CS |RST|
-#define TFT_RST        26
-#define TFT_RS         33
+// SPI Speed :
+#define TFT_SPI_SPEED  60000000
 
-
-// ESP32
-#define TFT_SCK 14
+#define TFT_SCK  14
 #define TFT_MISO 12
 #define TFT_MOSI 13
-#define TFT_CS   15
 
-// extern gpio_reg_map *ctrlRegs;
-// #define CS_ACTIVE    ctrlRegs->BRR  = TFT_CS_MASK //digitalWrite(TFT_CS, LOW); //
-// #define CS_IDLE      ctrlRegs->BSRR = TFT_CS_MASK //digitalWrite(TFT_CS, HIGH); //
-// #define CD_COMMAND   ctrlRegs->BRR  = TFT_RS_MASK //digitalWrite(TFT_RS, LOW); //
-// #define CD_DATA      ctrlRegs->BSRR = TFT_RS_MASK //digitalWrite(TFT_RS, HIGH); //
-/*#define CS_ACTIVE    digitalWrite(TFT_CS, LOW);
-#define CS_IDLE      digitalWrite(TFT_CS, HIGH);
-#define CD_COMMAND   digitalWrite(TFT_RS, LOW);
-#define CD_DATA      digitalWrite(TFT_RS, HIGH);*/
-/*#define CS_ACTIVE    gpio_set_level((gpio_num_t)TFT_CS, 0);
-#define CS_IDLE      gpio_set_level((gpio_num_t)TFT_CS, 1);
+//Control pins
+#define TFT_RST     26
+#define TFT_CS   	15
+#define TFT_DC      33   // Data/Command
+#define TFT_BLK     18   // Background led control
+
+
+/*
 #define CD_COMMAND   gpio_set_level((gpio_num_t)TFT_RS, 0);
 #define CD_DATA      gpio_set_level((gpio_num_t)TFT_RS, 1);
-*/
-#define CD_COMMAND   gpio_set_level((gpio_num_t)TFT_RS, 0);
-#define CD_DATA      gpio_set_level((gpio_num_t)TFT_RS, 1);
+
 #define CS_ACTIVE    GPIO.out_w1tc = ((uint32_t)1 << TFT_CS);
 #define CS_IDLE      GPIO.out_w1ts = ((uint32_t)1 << TFT_CS);
-
+*/
 #define swap(a, b) { int16_t t = a; a = b; b = t; }
 
 /*****************************************************************************/
@@ -95,29 +88,62 @@ class Adafruit_ILI9486_ESP32 : public Adafruit_GFX
 public:
 
 	Adafruit_ILI9486_ESP32(void);
-  
-	void	begin(void),
-			setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1),
-			pushColor(uint16_t color),
-			fillScreen(uint16_t color),
-			drawLine(int16_t x0, int16_t y0,int16_t x1, int16_t y1, uint16_t color),
-			drawPixel(int16_t x, int16_t y, uint16_t color),
-			drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color),
-			drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color),
-			fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color),
-			setRotation(uint8_t r),
-			invertDisplay(boolean i);
+
+	void	begin(void);
+
+	// tftDC    : TFT ILI9486 Data/Command pin
+	// tftReset : TFT ILI9486 rest pin
+	// tftCS    : TFT ILI9486 Chip select active to Low, some tft has no CS, leave it to 0
+	// tftBLK   : Is the pin used to activate or desactivate the Back led of the TFT, if none let it to 0
+	// spiMISO  : is actually optional (not implemented yet)
+	void	begin(uint8_t spiClk, uint8_t spiMOSI, uint8_t tftDC, uint8_t tftCS,
+										  uint8_t spiMISO, uint8_t tftReset, uint8_t tftBLK);
+
+	void	setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+
+	void	pushColor(uint16_t color);
+	void  pushColorN(uint16_t color, uint32_t n);
+	
+	void	drawPixel(int16_t x, int16_t y, uint16_t color);
+
+	void	fillScreen(uint16_t color);
+	void	drawLine(int16_t x0, int16_t y0,int16_t x1, int16_t y1, uint16_t color);
+
+	void	drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t color);
+	void	drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
+	void	fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+
+	void	setRotation(uint8_t r);
+	void	invertDisplay(boolean i);
+
+
 	uint16_t color565(uint8_t r, uint8_t g, uint8_t b);
 
 	void reset(void);
 
- private:
+protected:
+
+	uint8_t _spiClk;
+	uint8_t _spiMISO;
+	uint8_t _spiMOSI;
+	uint8_t _tftReset;
+	uint8_t _tftDC;
+	uint8_t _tftCS;
+	uint8_t _tftBLK;
 	uint8_t	tabcolor;
+
+	void writeCommand(uint8_t c);
+	void writeData(uint8_t d);
+	void writeData16(uint16_t d);
+	void writeData16(uint16_t d, uint32_t num);
+	void commandList(const uint8_t *addr);
+
+	void CD_DATA(void);
+	void CD_COMMAND(void);
+	void CS_ON(void);
+	void CS_OFF(void);
 };
-	void	writecommand(uint8_t c),
-			writedata(uint8_t d),
-			writedata16(uint16_t d),
-			writedata16(uint16_t d, uint32_t num),
-			commandList(uint8_t *addr);
+
+
 
 #endif //endif of the header file

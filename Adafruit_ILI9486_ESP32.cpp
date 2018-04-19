@@ -8,60 +8,18 @@ modified by IOXhop (www.ioxhop.com)
  - Edit SPI to standard SPI library.
 -----------
 */
-#include <Adafruit_ILI9486_ESP32.h>
+#include "Adafruit_ILI9486_ESP32.h"
 
 uint16_t lineBuffer[1];
-// gpio_reg_map *ctrlRegs;
+
 /*****************************************************************************/
 // Constructor uses hardware SPI, the pins being specific to each device
 /*****************************************************************************/
 Adafruit_ILI9486_ESP32::Adafruit_ILI9486_ESP32(void) : Adafruit_GFX(TFTWIDTH, TFTHEIGHT){}
+
+
 /*****************************************************************************/
-void writedata16(uint16_t c)
-{
-	CD_DATA;
-	CS_ACTIVE;
-    // SPI.write(c>>8);
-    // SPI.write(c&0xFF);
-	SPI.transfer(c>>8);
-	SPI.transfer(c&0xFF);
-	CS_IDLE;
-}
-/*****************************************************************************/
-void writedata16(uint16_t color, uint32_t num)
-{
-	/*
-	SPI.setDataSize(DATA_SIZE_16BIT);
-	CD_DATA;
-	CS_ACTIVE;
-	SPI.write(color, num);
-	CS_IDLE;
-	SPI.setDataSize(DATA_SIZE_8BIT);
-	*/
-	CD_DATA;
-	CS_ACTIVE;
-	for (int n=0;n<num;n++) {
-		SPI.transfer(color>>8);
-		SPI.transfer(color&0xFF);
-	}
-	CS_IDLE;
-}
-/*****************************************************************************/
-void writecommand(uint8_t c)
-{
-	CD_COMMAND;
-	CS_ACTIVE;
-    SPI.transfer(c);
-	CS_IDLE;
-}
-/*****************************************************************************/
-void writedata(uint8_t c)
-{
-	CD_DATA;
-	CS_ACTIVE;
-    SPI.transfer(c);
-	CS_IDLE;
-}
+
 /*****************************************************************************/
 // https://github.com/adafruit/adafruit-rpi-fbtft/blob/35890c52f9e3eef3237b76acc295585dd93fc8cd/fb_ili9486.c
 #define DELAY 0x80
@@ -71,7 +29,7 @@ const uint8_t ili9486_init_sequence[] =
 	2, 0xb0, 0x0,	// Interface Mode Control
 	1, 0x11,		// Sleep OUT
 	DELAY, 150,
-	2, 0x3A, 0x55,	// use 16 bits per pixel color
+	2, 0x3A, 0x66,	// use 18 bits per pixel color the only mode available on SPI-3wire ou SPI-4wire
 	2, 0x36, 0x48,	// MX, BGR == rotation 0
 	2, 0xC2, 0x44,	// Power Control 3
 	// VCOM Control 1
@@ -90,91 +48,121 @@ const uint8_t ili9486_init_sequence[] =
 	1, 0x29,	// Display ON
 	0			// end marker
 };
-/*****************************************************************************/
-// Companion code to the above tables.  Reads and issues
-// a series of LCD commands stored in PROGMEM byte array.
-/*****************************************************************************/
-void commandList(const uint8_t *addr)
-{
-	uint8_t  numBytes, tmp;
 
-	while ( (numBytes=(*addr++))>0 ) { // end marker == 0
-		if ( numBytes&DELAY ) {
-			//Serial.print("delay ");
-			tmp = *addr++;
-			//Serial.println(tmp);
-			delay(tmp); // up to 255 millis
-		} else {
-			//Serial.print(numBytes); Serial.print("byte(s): ");
-			tmp = *addr++;
-			//Serial.write('<'); Serial.print(tmp, HEX); Serial.write('>');
-			writecommand(tmp); // first byte is command
-			while (--numBytes) { //   For each argument...
-				tmp = *addr++;
-				//Serial.print(tmp, HEX); Serial.write('.');
-				writedata(tmp); // all consecutive bytes are data
-			}
-			//Serial.write('\n');
-		}
-	}
-}
-/*****************************************************************************/
+
+/******************************************************************************
+** Default begin                                                             **
+******************************************************************************/
 void Adafruit_ILI9486_ESP32::begin(void)
 {
-	// ctrlRegs = TFT_CNTRL->regs;
 
-	pinMode(TFT_RS, OUTPUT);
-	CD_DATA;
-	pinMode(TFT_CS, OUTPUT);
-	CS_IDLE;
+
+	begin(TFT_SCK, TFT_MOSI, TFT_DC, TFT_CS, TFT_MISO, TFT_RST, TFT_BLK);
+
+}
+
+/******************************************************************************
+** Parametrized Begin                                                        **
+******************************************************************************/
+void Adafruit_ILI9486_ESP32::begin(uint8_t spiClk, uint8_t spiMOSI, uint8_t tftDC, uint8_t tftCS,
+										  uint8_t spiMISO, uint8_t tftReset, uint8_t tftBLK)
+{
+
+	// Store pins
+	// Set Default
+	_spiClk  = spiClk;
+	_spiMISO = spiMISO;
+	_spiMOSI = spiMOSI;
+	_tftDC   = tftDC;
+	_tftReset= tftReset;
+	_tftCS   = tftCS;
+	_tftBLK  = tftBLK;
+
+
+	pinMode(tftDC, OUTPUT);
+
+	if (_tftBLK > 0) {
+		pinMode(_tftBLK, OUTPUT);
+		digitalWrite(_tftBLK, LOW);
+	}
+
+	if (_tftCS > 0) {
+		pinMode(_tftCS, OUTPUT);
+		digitalWrite(_tftCS, HIGH);
+	}
 
 	// toggle RST low to reset
-	if (TFT_RST > 0) {
-		//Serial.println("resetting display...");
-		pinMode(TFT_RST, OUTPUT);
-		digitalWrite(TFT_RST, HIGH);
+	if (_tftReset > 0) {
+		pinMode(_tftReset, OUTPUT);
+		digitalWrite(_tftReset, HIGH);
 		delay(20);
-		digitalWrite(TFT_RST, LOW);
+		digitalWrite(_tftReset, LOW);
 		delay(20);
-		digitalWrite(TFT_RST, HIGH);
+		digitalWrite(_tftReset, HIGH);
 		delay(200);
 	}
-    // SPI.beginTransaction(TFT_CS, SPISettings(36000000));
-	// SPI.beginTransaction(TFT_CS);
-	// init registers
-	SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
-	
-	SPI.beginTransaction(SPISettings(36000000, MSBFIRST, SPI_MODE0));
+
+	SPI.begin(_spiClk, _spiMISO, _spiMOSI, _tftCS);
+
+	SPI.beginTransaction(SPISettings(TFT_SPI_SPEED, MSBFIRST, SPI_MODE0));
 	commandList(ili9486_init_sequence);
+
+	if (_tftBLK > 0) {
+		digitalWrite(_tftBLK, HIGH);
+	}
+
 }
+
+
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1)
 {
-	writecommand(ILI9486_CASET); // Column addr set
-	writedata(x0 >> 8);
-	writedata(x0 & 0xFF);     // XSTART
-	writedata(x1 >> 8);
-	writedata(x1 & 0xFF);     // XEND
+	writeCommand(ILI9486_CASET); // Column addr set
+	writeData(x0 >> 8);
+	writeData(x0 & 0xFF);     // XSTART
+	writeData(x1 >> 8);
+	writeData(x1 & 0xFF);     // XEND
 
-	writecommand(ILI9486_PASET); // Row addr set
-	writedata(y0 >> 8);
-	writedata(y0);     // YSTART
-	writedata(y1 >> 8);
-	writedata(y1);     // YEND
+	writeCommand(ILI9486_PASET); // Row addr set
+	writeData(y0 >> 8);
+	writeData(y0);     // YSTART
+	writeData(y1 >> 8);
+	writeData(y1);     // YEND
 
-	writecommand(ILI9486_RAMWR); // write to RAM
+	writeCommand(ILI9486_RAMWR); // write to RAM
 }
+
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::pushColor(uint16_t color)
 {
-	writedata16(color);
+	CD_DATA();
+	CS_ON();
+		SPI.transfer( (((color>>11) & 0xb0011111) << 3) & 0xfc);
+		SPI.transfer( (((color>>5)  & 0xb0111111) << 2) & 0xfc);
+		SPI.transfer( ((color       & 0xb0011111) << 3) & 0xfc);
+	CS_OFF();
 }
+
+void Adafruit_ILI9486_ESP32::pushColorN(uint16_t color, uint32_t n)
+{
+	CD_DATA();
+	CS_ON();
+
+	for(uint32_t i=0; i<n;i++) {
+		SPI.transfer( (((color>>11) & 0xb0011111) << 3) & 0xfc);
+		SPI.transfer( (((color>>5)  & 0xb0111111) << 2) & 0xfc);
+		SPI.transfer( ((color       & 0xb0011111) << 3) & 0xfc);
+	}
+	CS_OFF();
+
+}
+
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::drawPixel(int16_t x, int16_t y, uint16_t color)
 {
 	if ((x < 0) || (x >= _width) || (y < 0) || (y >= _height)) return;
 
-	setAddrWindow(x, y, x + 1, y + 1);
+	setAddrWindow(x, y, x, y);
 	pushColor(color);
 }
 /*****************************************************************************/
@@ -186,7 +174,7 @@ void Adafruit_ILI9486_ESP32::drawFastVLine(int16_t x, int16_t y, int16_t h, uint
 	if (h < 2 ) { drawPixel(x, y, color); return; }
 
 	setAddrWindow(x, y, x, y + h - 1);
-	writedata16(color, h);
+	pushColorN(color,h);
 }
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color)
@@ -197,14 +185,14 @@ void Adafruit_ILI9486_ESP32::drawFastHLine(int16_t x, int16_t y, int16_t w, uint
 	if (w < 2 ) { drawPixel(x, y, color); return; }
 
 	setAddrWindow(x, y, x + w - 1, y);
-	writedata16(color, w);
+	pushColorN(color,w);
 }
 
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::fillScreen(uint16_t color)
 {
 	setAddrWindow(0, 0,  _width, _height);
-	writedata16(color, (_width*_height));
+	pushColorN(color, (_width*_height) );
 }
 
 /*****************************************************************************/
@@ -220,7 +208,7 @@ void Adafruit_ILI9486_ESP32::fillRect(int16_t x, int16_t y, int16_t w, int16_t h
 	}
 
 	setAddrWindow(x, y, x + w - 1, y + h - 1);
-	writedata16(color, (w*h));
+	pushColorN(color, (w*h) );
 }
 
 /*
@@ -338,29 +326,30 @@ uint16_t Adafruit_ILI9486_ESP32::color565(uint8_t r, uint8_t g, uint8_t b)
 {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
+
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::setRotation(uint8_t m)
 {
-	writecommand(ILI9486_MADCTL);
+	writeCommand(ILI9486_MADCTL);
 	rotation = m & 3; // can't be higher than 3
 	switch (rotation) {
 		case 0:
-			writedata(MADCTL_MX |MADCTL_BGR);
+			writeData(MADCTL_MX |MADCTL_BGR);
 			_width  = TFTWIDTH;
 			_height = TFTHEIGHT;
 			break;
 		case 1:
-			writedata(MADCTL_MV | MADCTL_BGR);
+			writeData(MADCTL_MV | MADCTL_BGR);
 			_width  = TFTHEIGHT;
 			_height = TFTWIDTH;
 			break;
 		case 2:
-			writedata(MADCTL_MY | MADCTL_BGR);
+			writeData(MADCTL_MY | MADCTL_BGR);
 			_width  = TFTWIDTH;
 			_height = TFTHEIGHT;
 			break;
 		case 3:
-			writedata(MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
+			writeData(MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
 			_width  = TFTHEIGHT;
 			_height = TFTWIDTH;
 			break;
@@ -369,5 +358,89 @@ void Adafruit_ILI9486_ESP32::setRotation(uint8_t m)
 /*****************************************************************************/
 void Adafruit_ILI9486_ESP32::invertDisplay(boolean i)
 {
-	writecommand(i ? ILI9486_INVON : ILI9486_INVOFF);
+	writeCommand(i ? ILI9486_INVON : ILI9486_INVOFF);
+}
+
+
+/* ===================================================================================
+== UTILITIES                                                                        ==
+====================================================================================*/
+
+/*****************************************************************************/
+// Companion code to the above tables.  Reads and issues
+// a series of LCD commands stored in PROGMEM byte array.
+/*****************************************************************************/
+void Adafruit_ILI9486_ESP32::commandList(const uint8_t *addr)
+{
+	uint8_t  numBytes, tmp;
+
+	while ( (numBytes=(*addr++))>0 ) { // end marker == 0
+		if ( numBytes&DELAY ) {
+			tmp = *addr++;
+			delay(tmp); // up to 255 millis
+		} else {
+			tmp = *addr++;
+			writeCommand(tmp); // first byte is command
+			while (--numBytes) { //   For each argument...
+				tmp = *addr++;
+				writeData(tmp); // all consecutive bytes are data
+			}
+		}
+	}
+}
+
+// 	_tftDC _tftReset _tftCS	_tftBLK
+
+void Adafruit_ILI9486_ESP32::CD_DATA(void) {
+	gpio_set_level((gpio_num_t)_tftDC, 1);
+}
+
+void Adafruit_ILI9486_ESP32::CD_COMMAND(void) {
+	gpio_set_level((gpio_num_t)_tftDC, 0);
+}
+
+void Adafruit_ILI9486_ESP32::CS_ON(void) {
+	if(_tftCS > 0) digitalWrite(_tftCS, LOW);
+}
+
+void Adafruit_ILI9486_ESP32::CS_OFF(void) {
+	if(_tftCS > 0) digitalWrite(_tftCS, HIGH);
+}
+
+
+/*****************************************************************************/
+void Adafruit_ILI9486_ESP32:: writeData(uint8_t c)
+{
+	CD_DATA();
+	CS_ON();
+    SPI.transfer(c);
+	CS_OFF();
+}
+
+void Adafruit_ILI9486_ESP32::writeData16(uint16_t c)
+{
+	CD_DATA();
+	CS_ON();
+	SPI.transfer(c>>8);
+	SPI.transfer(c&0xFF);
+	CS_OFF();
+}
+
+void Adafruit_ILI9486_ESP32::writeData16(uint16_t color, uint32_t num)
+{
+	CD_DATA();
+	CS_ON();
+	for (int n=0;n<num;n++) {
+		SPI.transfer(color>>8);
+		SPI.transfer(color&0xFF);
+	}
+	CS_OFF();
+}
+
+void Adafruit_ILI9486_ESP32::writeCommand(uint8_t c)
+{
+	CD_COMMAND();
+	CS_ON();
+    SPI.transfer(c);
+	CS_OFF();
 }

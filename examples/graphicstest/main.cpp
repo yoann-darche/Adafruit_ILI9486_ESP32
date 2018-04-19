@@ -13,91 +13,23 @@
   MIT license, all text above must be included in any redistribution
  ****************************************************/
 
+#include <Arduino.h>
+#include "Adafruit_ILI9486_ESP32.h"
 
-#include "Adafruit_ILI9486_STM32.h"
+
+#define TSPI_SCK  19
+#define TSPI_MISO 0   // Ignore
+#define TSPI_MOSI 13
+
+//Control pins
+#define TTFT_RST  26
+#define TTFT_CS   0    // Ignore
+#define TTFT_DC   15   // Data/Command
+#define TFT_BLK   18   // LED
 
  // for pin definitions, please refer to the header file
-Adafruit_ILI9486_STM32 tft;
+Adafruit_ILI9486_ESP32 tft;
 
-void setup()
-{
-	Serial.begin(115200);
-	while ( !Serial.isConnected() );
-
-	Serial.println("***** ILI9486 graphic Test *****");
-
-	tft.begin();
-}
-
-void doTest(void)
-{
-	Serial.println(F("Benchmark                Time (microseconds)"));
-
-	Serial.print(F("Screen fill              "));
-	Serial.println(testFillScreen());
-	delay(500);
-
-	Serial.print(F("Text                     "));
-	Serial.println(testText());
-	delay(3000);
-
-	Serial.print(F("Lines                    "));
-	Serial.println(testLines(CYAN));
-	delay(500);
-
-	Serial.print(F("Horiz/Vert Lines         "));
-	Serial.println(testFastLines(RED, BLUE));
-	delay(500);
-
-	Serial.print(F("Rectangles (outline)     "));
-	Serial.println(testRects(GREEN));
-	delay(500);
-
-	Serial.print(F("Rectangles (filled)      "));
-	Serial.println(testFilledRects(YELLOW, MAGENTA));
-	delay(500);
-
-	Serial.print(F("Circles (filled)         "));
-	Serial.println(testFilledCircles(10, MAGENTA));
-
-	Serial.print(F("Circles (outline)        "));
-	Serial.println(testCircles(10, WHITE));
-	delay(500);
-
-	Serial.print(F("Triangles (outline)      "));
-	Serial.println(testTriangles());
-	delay(500);
-
-	Serial.print(F("Triangles (filled)       "));
-	Serial.println(testFilledTriangles());
-	delay(500);
-
-	Serial.print(F("Rounded rects (outline)  "));
-	Serial.println(testRoundRects());
-	delay(500);
-
-	Serial.print(F("Rounded rects (filled)   "));
-	Serial.println(testFilledRoundRects());
-	delay(500);
-
-	Serial.println(F("Done!"));
-}
-
-
-void loop(void) {
-	for(uint8_t rotation=1; rotation<5; rotation++) {
-		tft.setRotation(rotation);
-		testText();
-		delay(1000);
-	}
-	Serial.println("\n************************************************\nWithout DMA:\n************************************************");
-	useDMA = 0;
-	doTest();
-	Serial.println("\n************************************************\nNow using DMA:\n************************************************");
-	useDMA = 1;
-	doTest();
-	while(1);
-}
 
 unsigned long testFillScreen() {
   unsigned long start = micros();
@@ -338,4 +270,81 @@ unsigned long testFilledRoundRects() {
   }
 
   return micros() - start;
+}
+
+
+void setup()
+{
+	Serial.begin(115200);
+//	while ( !Serial.isConnected() );
+
+	Serial.println("***** ILI9486 graphic Test *****");
+
+	tft.begin(TSPI_SCK,TSPI_MOSI,TTFT_DC,TTFT_CS,TSPI_MISO,TTFT_RST,TFT_BLK);
+}
+
+
+void doTest(void)
+{
+	Serial.println(F("Benchmark                Time (microseconds)"));
+
+	Serial.print(F("Screen fill              "));
+	Serial.println(testFillScreen());
+	delay(500);
+
+	Serial.print(F("Text                     "));
+	Serial.println(testText());
+	delay(3000);
+
+	Serial.print(F("Lines                    "));
+	Serial.println(testLines(CYAN));
+	delay(500);
+
+	Serial.print(F("Horiz/Vert Lines         "));
+	Serial.println(testFastLines(RED, BLUE));
+	delay(500);
+
+	Serial.print(F("Rectangles (outline)     "));
+	Serial.println(testRects(GREEN));
+	delay(500);
+
+	Serial.print(F("Rectangles (filled)      "));
+	Serial.println(testFilledRects(YELLOW, MAGENTA));
+	delay(500);
+
+	Serial.print(F("Circles (filled)         "));
+	Serial.println(testFilledCircles(10, MAGENTA));
+
+	Serial.print(F("Circles (outline)        "));
+	Serial.println(testCircles(10, WHITE));
+	delay(500);
+
+	Serial.print(F("Triangles (outline)      "));
+	Serial.println(testTriangles());
+	delay(500);
+
+	Serial.print(F("Triangles (filled)       "));
+	Serial.println(testFilledTriangles());
+	delay(500);
+
+	Serial.print(F("Rounded rects (outline)  "));
+	Serial.println(testRoundRects());
+	delay(500);
+
+	Serial.print(F("Rounded rects (filled)   "));
+	Serial.println(testFilledRoundRects());
+	delay(500);
+
+	Serial.println(F("Done!"));
+}
+
+
+void loop(void) {
+	for(uint8_t rotation=1; rotation<5; rotation++) {
+		tft.setRotation(rotation);
+		testText();
+		delay(1000);
+	}
+	doTest();
+	while(1);
 }
