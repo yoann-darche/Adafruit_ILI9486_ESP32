@@ -5,3 +5,6 @@ Based on Adafruit_ILI9486_STM32 lib: https://github.com/stevstrong/Adafruit_ILI9
 then modified to support ESP32 by IOXhop (www.ioxhop.com) : Adafruit_ILI9486_ESP32
 
 Updated to support SPI mode 4-wire by Yoann Darche
+
+
+>> Need the Adafruit_GFX librairy
